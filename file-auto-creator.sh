@@ -16,34 +16,46 @@ while true; do
         continue
     fi
     
-    # Extract the first line (filename)
-    filename=$(echo "$input" | head -n 1)
+    # Extract the first line (filename with possible comment)
+    first_line=$(echo "$input" | head -n 1)
     
-    # Remove any potential comments or artifacts from the filename
-    # This pattern handles common comment formats: // # /* */
-    clean_filename=$(echo "$filename" | sed -E 's/(\/\/|#|\/\*|\*\/).*$//' | tr -d ' \t')
+    # Extract filename from comment
+    # Handle // comments (common in many languages)
+    if [[ "$first_line" == *"//"* ]]; then
+        filename=$(echo "$first_line" | sed 's/\/\/ *//')
+    # Handle # comments (bash, python, etc)
+    elif [[ "$first_line" == \#* ]]; then
+        filename=$(echo "$first_line" | sed 's/# *//')
+    # Handle /* comments (C, etc)
+    elif [[ "$first_line" == "/*"* ]]; then
+        filename=$(echo "$first_line" | sed 's/\/\* *//' | sed 's/ *\*\///')
+    else
+        # If no comment markers, use the whole line
+        filename="$first_line"
+    fi
     
-    # Further clean the filename to handle any remaining special characters
-    clean_filename=$(echo "$clean_filename" | tr -dc '[:alnum:]._-/')
+    # Trim leading/trailing whitespace
+    filename=$(echo "$filename" | xargs)
     
     # Extract content (everything except the first line)
     content=$(echo "$input" | tail -n +2)
     
     # Confirm with user
     echo "-----------------------------------------"
-    echo "Detected filename: $clean_filename"
+    echo "Detected filename: $filename"
     read -p "Create this file? (y/n): " confirm
     
     if [[ $confirm == [yY]* ]]; then
         # Create directory if needed
-        dir=$(dirname "$clean_filename")
+        dir=$(dirname "$filename")
         if [ "$dir" != "." ]; then
+            echo "Creating directory: $dir"
             mkdir -p "$dir"
         fi
         
         # Write content to file
-        echo "$content" > "$clean_filename"
-        echo "File created: $clean_filename"
+        echo "$content" > "$filename"
+        echo "File created: $filename"
     else
         echo "Operation cancelled."
     fi
