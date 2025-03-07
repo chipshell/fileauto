@@ -5,14 +5,6 @@ echo "Paste your code snippet (first line should contain the filename)"
 echo "Press Ctrl+D when done with input"
 echo "-----------------------------------------"
 
-show_help() {
-    echo "Available options:"
-    echo "  y - Create the file with the detected filename"
-    echo "  n - Cancel the operation"
-    echo "  e - Edit the filename manually"
-    echo "  ? - Show this help message"
-}
-
 while true; do
     # Read multiline input until Ctrl+D (EOF)
     echo "Waiting for input..."
@@ -26,81 +18,66 @@ while true; do
     
     # Extract the first line (filename with possible comment)
     first_line=$(echo "$input" | head -n 1)
+    detected_filename=""
     
-    # Extract filename from comment
+    # Check if first line looks like a filename comment
     # Handle // comments (common in many languages)
-    if [[ "$first_line" == *"//"* ]]; then
-        filename=$(echo "$first_line" | sed 's/\/\/ *//')
+    if [[ "$first_line" =~ ^[[:space:]]*//(.*) ]]; then
+        comment_content=$(echo "$first_line" | sed 's/^[[:space:]]*\/\/ *//')
+        # Check if the comment content looks like a filename (contains . or /)
+        if [[ "$comment_content" =~ [\./] ]]; then
+            detected_filename="$comment_content"
+        fi
     # Handle # comments (bash, python, etc)
-    elif [[ "$first_line" == \#* ]]; then
-        filename=$(echo "$first_line" | sed 's/# *//')
+    elif [[ "$first_line" =~ ^[[:space:]]*#(.*) ]]; then
+        comment_content=$(echo "$first_line" | sed 's/^[[:space:]]*# *//')
+        # Check if the comment content looks like a filename (contains . or /)
+        if [[ "$comment_content" =~ [\./] ]]; then
+            detected_filename="$comment_content"
+        fi
     # Handle /* comments (C, etc)
-    elif [[ "$first_line" == "/*"* ]]; then
-        filename=$(echo "$first_line" | sed 's/\/\* *//' | sed 's/ *\*\///')
-    else
-        # If no comment markers, use the whole line
-        filename="$first_line"
+    elif [[ "$first_line" =~ ^[[:space:]]*/\*(.*)\*/ ]]; then
+        comment_content=$(echo "$first_line" | sed 's/^[[:space:]]*\/\* *//' | sed 's/ *\*\///')
+        # Check if the comment content looks like a filename (contains . or /)
+        if [[ "$comment_content" =~ [\./] ]]; then
+            detected_filename="$comment_content"
+        fi
     fi
     
-    # Trim leading/trailing whitespace
-    filename=$(echo "$filename" | xargs)
+    # Trim leading/trailing whitespace if we have a detected filename
+    if [ -n "$detected_filename" ]; then
+        detected_filename=$(echo "$detected_filename" | xargs)
+    fi
     
     # Extract content (everything except the first line)
     content=$(echo "$input" | tail -n +2)
     
-    # Confirm with user
+    # Show detected filename and allow editing
     echo "-----------------------------------------"
-    echo "Detected filename: $filename"
+    if [ -n "$detected_filename" ]; then
+        echo "Filename detected from first line"
+        # Use read -e for editability and -i for prefill
+        read -e -p "Enter filename (press Enter to confirm): " -i "$detected_filename" filename
+    else
+        echo "No filename detected from first line"
+        read -e -p "Enter filename: " filename
+    fi
     
-    valid_response=false
-    while [ "$valid_response" = false ]; do
-        read -p "Create this file? (y/n/e/?) " confirm
+    # Check if filename is provided
+    if [ -z "$filename" ]; then
+        echo "No filename provided. Operation cancelled."
+    else
+        # Create directory if needed
+        dir=$(dirname "$filename")
+        if [ "$dir" != "." ]; then
+            echo "Creating directory: $dir"
+            mkdir -p "$dir"
+        fi
         
-        case $confirm in
-            [yY])
-                valid_response=true
-                # Create directory if needed
-                dir=$(dirname "$filename")
-                if [ "$dir" != "." ]; then
-                    echo "Creating directory: $dir"
-                    mkdir -p "$dir"
-                fi
-                
-                # Write content to file
-                echo "$content" > "$filename"
-                echo "File created: $filename"
-                ;;
-            [nN])
-                valid_response=true
-                echo "Operation cancelled."
-                ;;
-            [eE])
-                valid_response=true
-                read -p "Enter new filename: " new_filename
-                
-                if [ -z "$new_filename" ]; then
-                    echo "No filename provided. Operation cancelled."
-                else
-                    # Create directory if needed
-                    dir=$(dirname "$new_filename")
-                    if [ "$dir" != "." ]; then
-                        echo "Creating directory: $dir"
-                        mkdir -p "$dir"
-                    fi
-                    
-                    # Write content to file
-                    echo "$content" > "$new_filename"
-                    echo "File created: $new_filename"
-                fi
-                ;;
-            \?)
-                show_help
-                ;;
-            *)
-                echo "Invalid option. Please choose y, n, e, or ?"
-                ;;
-        esac
-    done
+        # Write content to file
+        echo "$content" > "$filename"
+        echo "File created: $filename"
+    fi
     
     echo "-----------------------------------------"
     echo "Ready for next input. Press Ctrl+D after pasting."
