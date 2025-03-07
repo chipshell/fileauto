@@ -5,6 +5,16 @@ echo "Paste your code snippet (first line should contain the filename)"
 echo "Press Ctrl+D when done with input"
 echo "-----------------------------------------"
 
+# Enable programmable completion
+if [[ -z "$BASH_VERSION" ]]; then
+    echo "This script requires bash to enable tab completion"
+fi
+
+# Make sure readline is available
+if ! type -t bind >/dev/null; then
+    echo "Warning: readline functionality may not be available"
+fi
+
 while true; do
     # Read multiline input until Ctrl+D (EOF)
     echo "Waiting for input..."
@@ -52,15 +62,21 @@ while true; do
     # Extract content (everything except the first line)
     content=$(echo "$input" | tail -n +2)
     
-    # Show detected filename and allow editing
+    # Show detected filename and allow editing with tab completion
     echo "-----------------------------------------"
+    
+    # Enable tab completion for filenames
+    bind "set completion-ignore-case on" 2>/dev/null
+    bind "TAB: complete" 2>/dev/null
+    
     if [ -n "$detected_filename" ]; then
         echo "Filename detected from first line"
         # Use read -e for editability and -i for prefill
-        read -e -p "Enter filename (press Enter to confirm): " -i "$detected_filename" filename
+        # The -e flag enables readline which includes tab completion
+        read -e -p "Enter filename (press Enter to confirm, TAB for completion): " -i "$detected_filename" filename
     else
         echo "No filename detected from first line"
-        read -e -p "Enter filename: " filename
+        read -e -p "Enter filename (use TAB for completion): " filename
     fi
     
     # Check if filename is provided
