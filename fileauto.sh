@@ -29,6 +29,7 @@ while true; do
     # Extract the first line (filename with possible comment)
     first_line=$(echo "$input" | head -n 1)
     detected_filename=""
+    skip_first_line=false
     
     # Check if first line looks like a filename comment
     # Handle // comments (common in many languages)
@@ -37,6 +38,7 @@ while true; do
         # Check if the comment content looks like a filename (contains . or /)
         if [[ "$comment_content" =~ [\./] ]]; then
             detected_filename="$comment_content"
+            skip_first_line=true
         fi
     # Handle # comments (bash, python, etc)
     elif [[ "$first_line" =~ ^[[:space:]]*#(.*) ]]; then
@@ -44,6 +46,7 @@ while true; do
         # Check if the comment content looks like a filename (contains . or /)
         if [[ "$comment_content" =~ [\./] ]]; then
             detected_filename="$comment_content"
+            skip_first_line=true
         fi
     # Handle /* comments (C, etc)
     elif [[ "$first_line" =~ ^[[:space:]]*/\*(.*)\*/ ]]; then
@@ -51,6 +54,7 @@ while true; do
         # Check if the comment content looks like a filename (contains . or /)
         if [[ "$comment_content" =~ [\./] ]]; then
             detected_filename="$comment_content"
+            skip_first_line=true
         fi
     fi
     
@@ -59,8 +63,12 @@ while true; do
         detected_filename=$(echo "$detected_filename" | xargs)
     fi
     
-    # Extract content (everything except the first line)
-    content=$(echo "$input" | tail -n +2)
+    # Extract content - only skip the first line if it was used for filename detection
+    if [ "$skip_first_line" = true ]; then
+        content=$(echo "$input" | tail -n +2)
+    else
+        content="$input"
+    fi
     
     # Show detected filename and allow editing with tab completion
     echo "-----------------------------------------"
